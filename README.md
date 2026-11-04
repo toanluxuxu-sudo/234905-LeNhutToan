@@ -58,7 +58,8 @@ và cho phép IP của máy chạy backend.
 - Câu 3: Xây dựng backend API và kiểm thử các chức năng quản lý thiết bị.
 - Câu 4: Xây dựng giao diện React kết nối backend API.
 - Câu 5: Đóng gói backend bằng Docker, chạy thử và đẩy image lên Docker Hub.
-- Câu 6 trở đi: Đóng gói frontend và triển khai Render sẽ được cập nhật sau.
+- Câu 6: Đóng gói frontend bằng Docker, kết nối backend và đẩy image lên Docker Hub.
+- Câu 7 trở đi: Triển khai Render và hoàn thiện bài nộp sẽ được cập nhật sau.
 
 ## Câu 2. Tạo cơ sở dữ liệu MongoDB Atlas
 
@@ -346,3 +347,117 @@ bằng lệnh ở phần trên.
 - Đã build image backend và chạy thử container.
 - Endpoint `http://localhost:5001/health` trả về `status: ok`, `database: connected`.
 - Đã đẩy image `234905lenhuttoan/backend:latest` lên Docker Hub.
+
+## Câu 6. Đóng gói frontend bằng Docker và đẩy lên Docker Hub
+
+### Docker image frontend
+
+- Image: `234905lenhuttoan/frontend:latest`
+- Docker Hub: https://hub.docker.com/r/234905lenhuttoan/frontend
+- Tag: https://hub.docker.com/r/234905lenhuttoan/frontend/tags
+
+Frontend sử dụng Dockerfile hai giai đoạn: Node.js 24 để cài thư viện và
+build React, sau đó Nginx phục vụ các tệp trong `dist`. Image cuối không
+chứa thư viện build hoặc `.env` của máy phát triển.
+
+### Build image
+
+Chạy tại thư mục gốc dự án:
+
+```powershell
+docker build -t 234905lenhuttoan/frontend:latest ./frontend
+```
+
+Trong bản Docker, build argument `VITE_API_URL` mặc định là `/`.
+Trình duyệt gọi API trên cùng địa chỉ với frontend; Nginx chuyển tiếp
+`/api/` và `/health` sang backend qua biến môi trường `API_UPSTREAM`.
+Vì vậy không cần thay CORS backend khi mở giao diện Docker ở cổng `8080`.
+Cấu hình phát triển trực tiếp bằng Vite ở Câu 4 vẫn được giữ nguyên.
+
+### Chạy frontend kết nối container backend
+
+Tạo mạng một lần nếu chưa có:
+
+```powershell
+docker network create qlthietbi-net
+```
+
+Nếu container `backend-test` từ Câu 5 đang chạy, nối nó vào mạng một lần:
+
+```powershell
+docker network connect qlthietbi-net backend-test
+```
+
+Nếu backend chưa chạy, dùng lệnh sau thay cho thao tác nối mạng:
+
+```powershell
+docker run -d --rm --name backend-test --network qlthietbi-net --env-file ./backend/.env -e PORT=5000 -p 127.0.0.1:5001:5000 234905lenhuttoan/backend:latest
+```
+
+Khi backend đã sẵn sàng, chạy frontend:
+
+```powershell
+docker run -d --rm --name frontend-test --network qlthietbi-net -e API_UPSTREAM=http://backend-test:5000 -p 127.0.0.1:8080:8080 234905lenhuttoan/frontend:latest
+```
+
+Nếu container cùng tên đang chạy, sử dụng container đó thay vì chạy thêm.
+Trên máy hiện tại, mạng và hai container đã được thiết lập theo cấu hình trên.
+
+| Địa chỉ | Mục đích |
+|---|---|
+| http://localhost:8080 | Giao diện React từ Docker |
+| http://localhost:8080/health | Kiểm tra kết nối backend qua Nginx |
+| http://localhost:8080/api/devices | Danh sách thiết bị qua Nginx |
+
+Kiểm tra container:
+
+```powershell
+docker ps
+docker logs frontend-test
+docker exec frontend-test nginx -t
+```
+
+Dừng riêng frontend khi không dùng:
+
+```powershell
+docker stop frontend-test
+```
+
+### Cấu hình triển khai
+
+| Tham số | Ý nghĩa |
+|---|---|
+| Build argument `VITE_API_URL` | Mặc định `/` để gọi API qua Nginx trên cùng origin |
+| Environment `API_UPSTREAM` | URL backend mà Nginx chuyển tiếp đến, không thêm dấu `/` cuối |
+| Environment `PORT` | Cổng Nginx trong container, mặc định `8080` |
+
+Khi chuyển lên Render, đặt `API_UPSTREAM` bằng URL HTTPS backend thật.
+Nginx hỗ trợ HTTPS upstream với kiểm tra chứng chỉ. Không dùng
+`backend-test` hoặc `host.docker.internal` làm địa chỉ backend trên Render.
+Nếu thay `PORT`, ánh xạ cổng Docker phải khớp cổng mới.
+
+Tệp `frontend/.dockerignore` loại `node_modules`, `dist`, `.env` và
+`.env.*` khỏi build context. Frontend không chứa thông tin xác thực MongoDB.
+
+### Đẩy image lên Docker Hub
+
+```powershell
+docker login
+docker push 234905lenhuttoan/frontend:latest
+```
+
+Tải image về máy khác:
+
+```powershell
+docker pull 234905lenhuttoan/frontend:latest
+```
+
+### Kiểm tra
+
+- Build image thành công; cấu hình Nginx hợp lệ.
+- Trang HTML và JavaScript được phục vụ thành công ở cổng `8080`.
+- `/health` qua Nginx trả về HTTP 200, database đã kết nối.
+- API qua Nginx trả danh sách ba thiết bị từ MongoDB Atlas.
+- Đã kiểm tra thêm, xem chi tiết, sửa, tìm kiếm và xóa bản ghi thử qua cổng `8080`.
+- API từ chối mã thiết bị trùng với HTTP 409; dữ liệu thử đã được xóa sau kiểm tra.
+- Đã đẩy image `234905lenhuttoan/frontend:latest` lên Docker Hub.
