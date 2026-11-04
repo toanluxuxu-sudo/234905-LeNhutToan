@@ -55,3 +55,25 @@ và cấu hình package.json ở các câu tiếp theo.
 
 - Câu 1: Khởi tạo cấu trúc dự án và quản lý mã nguồn bằng GitHub.
 - Hướng dẫn chạy và URL triển khai sẽ được cập nhật khi hoàn thành.
+## Câu 2. Tạo cơ sở dữ liệu MongoDB Atlas
+
+- Database: 234905_LeNhutToan
+- Collection: devices
+- Có 3 thiết bị mẫu: máy chiếu, máy tính và thiết bị âm thanh.
+
+### Các trường dữ liệu
+
+deviceId, name, deviceType, room, brand, model,
+quantity, status, purchaseDate, description.
+
+### Trạng thái thiết bị
+
+- Đang sử dụng
+- Hư hỏng
+- Đang sửa chữa
+- Ngừng sử dụng
+
+### Cấu hình kết nối
+
+Sao chép backend/.env.example thành backend/.env.
+Điền chuỗi kết nối MongoDB Atlas vào biến MONGODB_URI.
