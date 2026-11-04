@@ -57,7 +57,8 @@ và cho phép IP của máy chạy backend.
 - Câu 2: Tạo database MongoDB Atlas, cấu hình kết nối và dữ liệu mẫu.
 - Câu 3: Xây dựng backend API và kiểm thử các chức năng quản lý thiết bị.
 - Câu 4: Xây dựng giao diện React kết nối backend API.
-- Câu 5 trở đi: Docker và triển khai Render sẽ được cập nhật sau.
+- Câu 5: Đóng gói backend bằng Docker, chạy thử và đẩy image lên Docker Hub.
+- Câu 6 trở đi: Đóng gói frontend và triển khai Render sẽ được cập nhật sau.
 
 ## Câu 2. Tạo cơ sở dữ liệu MongoDB Atlas
 
@@ -259,3 +260,89 @@ Quy trình kiểm tra trực tiếp trên giao diện:
 4. Sửa trạng thái, tải lại trang và kiểm tra dữ liệu vẫn được lưu.
 5. Thử thêm mã trùng để kiểm tra thông báo lỗi.
 6. Xóa thiết bị kiểm thử và xác nhận thiết bị không còn trong danh sách.
+
+## Câu 5. Đóng gói backend bằng Docker và đẩy lên Docker Hub
+
+### Docker image backend
+
+- Image: `234905lenhuttoan/backend:latest`
+- Docker Hub: https://hub.docker.com/r/234905lenhuttoan/backend
+- Tag: https://hub.docker.com/r/234905lenhuttoan/backend/tags
+
+Yêu cầu: cài Docker Desktop, khởi động Docker Engine và chuẩn bị
+`backend/.env` với cấu hình MongoDB Atlas thật. IP máy chạy container
+phải được cho phép trong Atlas IP Access List.
+
+### Build image
+
+Chạy tại thư mục gốc dự án:
+
+```powershell
+docker build -t backend:latest ./backend
+docker tag backend:latest 234905lenhuttoan/backend:latest
+```
+
+`backend/Dockerfile` sử dụng Node.js 24 Alpine, cài thư viện bằng
+`npm ci --omit=dev` và chạy `server.js` bằng user `node`.
+
+### Chạy container
+
+```powershell
+docker run --rm --name backend-test --env-file ./backend/.env -e PORT=5000 -p 127.0.0.1:5001:5000 234905lenhuttoan/backend:latest
+```
+
+Ứng dụng trong container chạy ở cổng `5000`, được ánh xạ ra cổng `5001`
+trên máy để tránh trùng backend đang chạy trực tiếp ở cổng `5000`.
+Giữ terminal chạy trong khi kiểm tra.
+
+| Địa chỉ | Mục đích |
+|---|---|
+| http://localhost:5001/health | Kiểm tra backend và kết nối Atlas |
+| http://localhost:5001/api/devices | Xem danh sách thiết bị |
+
+Xem container và log trong terminal khác:
+
+```powershell
+docker ps
+docker logs backend-test
+```
+
+Dừng container bằng `Ctrl + C` trong terminal chạy container, hoặc:
+
+```powershell
+docker stop backend-test
+```
+
+Container thử được tự động xóa sau khi dừng nhờ tùy chọn `--rm`.
+
+### Đẩy image lên Docker Hub
+
+Đăng nhập bằng tài khoản `234905lenhuttoan` rồi push:
+
+```powershell
+docker login
+docker push 234905lenhuttoan/backend:latest
+```
+
+Để tải image về máy khác:
+
+```powershell
+docker pull 234905lenhuttoan/backend:latest
+```
+
+Sau khi tải, chuẩn bị tệp cấu hình `.env` trên máy đó và chạy container
+bằng lệnh ở phần trên.
+
+### Cấu hình và bảo vệ thông tin kết nối
+
+- `backend/.dockerignore` loại `.env`, `.env.*`, `node_modules` và các tệp không cần thiết khỏi build context.
+- Mật khẩu và chuỗi kết nối thật không được nhúng vào image hoặc đưa lên GitHub.
+- Các biến môi trường được truyền khi chạy container qua `--env-file`.
+- `PORT=5000` được đặt rõ ràng khi chạy để khớp với ánh xạ cổng.
+- Cấu hình DNS tùy chọn `MONGODB_DNS_SERVERS` được đọc từ môi trường giống khi chạy trực tiếp.
+
+### Kết quả thực hiện
+
+- Đã build image backend và chạy thử container.
+- Endpoint `http://localhost:5001/health` trả về `status: ok`, `database: connected`.
+- Đã đẩy image `234905lenhuttoan/backend:latest` lên Docker Hub.
