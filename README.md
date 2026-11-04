@@ -59,7 +59,8 @@ và cho phép IP của máy chạy backend.
 - Câu 4: Xây dựng giao diện React kết nối backend API.
 - Câu 5: Đóng gói backend bằng Docker, chạy thử và đẩy image lên Docker Hub.
 - Câu 6: Đóng gói frontend bằng Docker, kết nối backend và đẩy image lên Docker Hub.
-- Câu 7 trở đi: Triển khai Render và hoàn thiện bài nộp sẽ được cập nhật sau.
+- Câu 7: Triển khai frontend Docker lên Render và cấu hình kết nối API công khai.
+- Câu 8–9: Hoàn thiện tài liệu backend Render, kiểm tra tổng thể và bài nộp.
 
 ## Câu 2. Tạo cơ sở dữ liệu MongoDB Atlas
 
@@ -461,3 +462,65 @@ docker pull 234905lenhuttoan/frontend:latest
 - Đã kiểm tra thêm, xem chi tiết, sửa, tìm kiếm và xóa bản ghi thử qua cổng `8080`.
 - API từ chối mã thiết bị trùng với HTTP 409; dữ liệu thử đã được xóa sau kiểm tra.
 - Đã đẩy image `234905lenhuttoan/frontend:latest` lên Docker Hub.
+
+## Câu 7. Triển khai frontend trên Render
+
+### URL công khai
+
+- Frontend: https://web-234905.onrender.com
+- Backend sử dụng: https://api-234905.onrender.com
+- Kiểm tra kết nối qua frontend: https://web-234905.onrender.com/health
+- Danh sách thiết bị qua frontend: https://web-234905.onrender.com/api/devices
+
+### Cách triển khai
+
+1. Đăng nhập Render Dashboard, chọn New → Web Service → Existing Image.
+2. Nhập image `docker.io/234905lenhuttoan/frontend:latest` và chọn Connect.
+3. Đặt tên dịch vụ `web-234905`, chọn khu vực cùng backend và gói Free.
+4. Giữ lệnh khởi động mặc định của image.
+5. Khai báo các biến môi trường bên dưới.
+6. Đặt Health Check Path là `/`, sau đó Deploy Web Service.
+7. Khi dịch vụ Live, truy cập URL công khai để kiểm tra giao diện.
+
+| Biến môi trường | Giá trị |
+|---|---|
+| `PORT` | `10000` |
+| `API_UPSTREAM` | `https://api-234905.onrender.com` |
+
+`API_UPSTREAM` không có dấu `/` cuối và không bao gồm `/api`.
+Frontend không sử dụng `localhost` hoặc tên container Docker làm backend
+trên Render. Backend phải triển khai và kết nối Atlas thành công trước
+khi kiểm tra các chức năng dữ liệu của frontend.
+
+### Kết nối frontend với backend
+
+Image frontend đã build với `VITE_API_URL=/`. Trình duyệt gọi `/api/devices`
+trên cùng domain frontend, rồi Nginx chuyển tiếp yêu cầu đến `API_UPSTREAM`.
+Nginx đọc `PORT` và `API_UPSTREAM` khi khởi động container. Cách này cho phép
+đổi backend qua cấu hình Render mà không cần build lại frontend.
+
+Frontend phục vụ qua HTTPS; Nginx cũng sử dụng HTTPS và kiểm tra chứng chỉ
+khi kết nối đến backend. Thông tin xác thực MongoDB chỉ nằm ở backend.
+
+### Kiểm tra sau triển khai
+
+Đã kiểm tra các URL công khai:
+
+| Đường dẫn | Kết quả |
+|---|---|
+| Frontend `/` | HTTP 200, phục vụ ứng dụng React |
+| Frontend `/health` | HTTP 200, `status: ok`, `database: connected` |
+| Frontend `/api/devices` | HTTP 200, trả về ba thiết bị |
+| Backend `/health` | HTTP 200, `database: connected` |
+
+Quy trình kiểm tra chức năng trên giao diện đã triển khai:
+
+1. Xem danh sách và chi tiết thiết bị.
+2. Tìm kiếm theo mã, tên, loại hoặc phòng học.
+3. Thêm một thiết bị thử bằng mã mới.
+4. Cập nhật trạng thái và tải lại trang để kiểm tra dữ liệu đã lưu.
+5. Xóa thiết bị thử và kiểm tra thông báo kết quả.
+
+Khi đẩy phiên bản image mới lên Docker Hub, dùng Manual Deploy trên Render
+để triển khai image mới. Gói Free có thể tạm dừng khi không có truy cập;
+lần mở tiếp theo có thể phải chờ dịch vụ khởi động lại.
