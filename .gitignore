@@ -1,0 +1,17 @@
+# Thu vien va ket qua build
+node_modules/
+dist/
+build/
+coverage/
+
+# Bien moi truong va thong tin bi mat
+.env
+.env.*
+!.env.example
+
+# Tep log
+*.log
+
+# Tep cua he dieu hanh
+.DS_Store
+Thumbs.db
